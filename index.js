@@ -10,9 +10,12 @@ import { spawn } from 'child_process';
 
 let inkscapeVersion; // old = 0.92 or older, new = anything after
 
-// Inkscape.app on macOS does not put the binary in PATH
-const macInkscape = '/Applications/Inkscape.app/Contents/MacOS/inkscape';
-const inkscapeBin = process.env.INKSCAPE_PATH || (fs.existsSync(macInkscape) ? macInkscape : 'inkscape');
+// macOS app bundle and Windows installer don't put the binary in PATH
+const knownInkscapePaths = [
+	'/Applications/Inkscape.app/Contents/MacOS/inkscape',
+	path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Inkscape', 'bin', 'inkscape.exe'),
+];
+const inkscapeBin = process.env.INKSCAPE_PATH || knownInkscapePaths.find(p => fs.existsSync(p)) || 'inkscape';
 
 const argv = yargs(process.argv)
 	.option('id', {
