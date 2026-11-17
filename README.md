@@ -12,6 +12,8 @@ Download your books from [Sanoma](https://sanoma.it) as PDFs.
 
 **PLEASE NOTE THAT YOU ALSO NEED TO INSTALL [INKSCAPE](https://inkscape.org/) AND MAKE SURE THAT IT'S REACHABLE TROUGH THE COMMANDLINE (AKA INKSCAPE MUST BE IN YOUR PATH VARIABLE)**
 
+On macOS `brew install --cask inkscape` works out of the box (the script finds `/Applications/Inkscape.app` automatically). Otherwise set `INKSCAPE_PATH` to the inkscape executable.
+
 ### Usage
 
 1. Open a terminal window in the folder where you extracted the repo

@@ -8,6 +8,12 @@ import fsExtra from 'fs-extra';
 import path from 'path';
 import { spawn } from 'child_process';
 
+let inkscapeVersion; // old = 0.92 or older, new = anything after
+
+// Inkscape.app on macOS does not put the binary in PATH
+const macInkscape = '/Applications/Inkscape.app/Contents/MacOS/inkscape';
+const inkscapeBin = process.env.INKSCAPE_PATH || (fs.existsSync(macInkscape) ? macInkscape : 'inkscape');
+
 const argv = yargs(process.argv)
 	.option('id', {
 		alias: 'i',
@@ -57,6 +63,14 @@ const argv = yargs(process.argv)
 const prompt = PromptSync({ sigint: true });
 
 (async () => {
+
+	// fail before downloading the book, not after
+	try {
+		await getInkscapeVersion();
+	} catch (e) {
+		console.error(e.message);
+		process.exit(1);
+	}
 
 	await fsExtra.ensureDir('tmp');
 
@@ -226,31 +240,35 @@ const prompt = PromptSync({ sigint: true });
 	console.log('Done');
 })();
 
-let inkscapeVersion; // old = 0.92 or older, new = anything after
-
 async function getInkscapeVersion() {
 	return new Promise((resolve, reject) => {
-		let convert = spawn('inkscape', ['--version']);
+		let convert = spawn(inkscapeBin, ['--version']);
+		let out = '';
 
-		convert.stdout.on("data", data => {
-			const version = data.toString();
-			const [_, major, minor ] = version.match(/(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)/);
-			if (major == 0 && minor <= 92) inkscapeVersion = "old";
-			else inkscapeVersion = "new";
+		convert.on('error', () => reject(new Error(
+			`Inkscape not found ("${inkscapeBin}"). Install it from https://inkscape.org/ ` +
+			`(macOS: brew install --cask inkscape) or set INKSCAPE_PATH to the inkscape executable.`
+		)));
+		convert.stdout.on('data', data => out += data);
+		convert.on('close', () => {
+			const match = out.match(/(0|[1-9]\d*)\.(0|[1-9]\d*)/);
+			if (!match) return reject(new Error(`Could not read Inkscape version from "${inkscapeBin} --version"`));
+			const [, major, minor] = match;
+			inkscapeVersion = major == 0 && minor <= 92 ? "old" : "new";
 			resolve();
 		});
 	});
 }
 
 async function convertPage(input, output) {
-	return new Promise(async (resolve, reject) => {
-		if (!inkscapeVersion) await getInkscapeVersion();
+	if (!inkscapeVersion) await getInkscapeVersion();
+	return new Promise((resolve, reject) => {
+		let convert = spawn(inkscapeBin, [(inkscapeVersion == "old" ? '--export-pdf=' : '--export-filename=') +output, input]);
 
-		let convert = spawn('inkscape', [(inkscapeVersion == "old" ? '--export-pdf=' : '--export-filename=') +output, input]);
-
+		convert.on('error', reject);
 		convert.on('close', (code) => {
 			if (code == 0) resolve();
-			else reject(code);
+			else reject(new Error(`Inkscape exited with code ${code} converting ${input}`));
 		});
 	});
 }
